@@ -16,11 +16,13 @@ endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 set(SOURCES
-    src/main.cpp
+  src/loader.cpp
+  src/main.cpp
 )
 
 set(HEADERS
   include/stb_image.h
+  include/loader.h
 )
 
 set(COMPILE_FLAGS_DEBUG -Wall -ggdb3 -O0)
