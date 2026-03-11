@@ -17,12 +17,14 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 set(SOURCES
   src/loader.cpp
+  src/preprocessing.cpp
   src/main.cpp
 )
 
 set(HEADERS
   include/stb_image.h
   include/loader.h
+  include/preprocessing.h
 )
 
 set(COMPILE_FLAGS_DEBUG -Wall -ggdb3 -O0)
