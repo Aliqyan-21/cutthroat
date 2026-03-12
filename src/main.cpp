@@ -23,16 +23,14 @@ int main(int argc, char *argv[]) {
   auto s2 = fd.get_spectrum_2d();
 
   for (int i{0}; i < 10; ++i) {
-    float mag = std::sqrtf(s1[i].real * s1[i].real +
-                           s1[i].imag * s1[i].imag);
+    float mag = std::sqrtf(s1[i].real * s1[i].real + s1[i].imag * s1[i].imag);
     std::cout << "mag[" << i << "] = " << mag << std::endl;
   }
 
   std::cout << std::endl;
 
   for (int i{0}; i < 10; ++i) {
-    float mag = std::sqrtf(s2[i].real * s2[i].real +
-                           s2[i].imag * s2[i].imag);
+    float mag = std::sqrtf(s2[i].real * s2[i].real + s2[i].imag * s2[i].imag);
     std::cout << "mag[" << i << "] = " << mag << std::endl;
   }
 
