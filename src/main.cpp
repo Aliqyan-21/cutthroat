@@ -1,7 +1,7 @@
 #include <iostream>
 
+#include "fft_detector.h"
 #include "loader.h"
-#include "preprocessing.h"
 
 struct Args {
   std::string file_path;
@@ -17,13 +17,23 @@ int main(int argc, char *argv[]) {
 
   auto d = load_image(args.file_path);
 
-  std::cout << "image loaded with width = " << d.width
-            << " and height = " << d.height << std::endl;
-
-  auto gray = make_grayscale(d);
+  FFTDetector fd(d);
+  fd.run_detection();
+  auto s1 = fd.get_spectrum_1d();
+  auto s2 = fd.get_spectrum_2d();
 
   for (int i{0}; i < 10; ++i) {
-    for (int j{0}; j < 10; ++j) { std::cout << gray[i][j] << std::endl; }
+    float mag = std::sqrtf(s1[i].real * s1[i].real +
+                           s1[i].imag * s1[i].imag);
+    std::cout << "mag[" << i << "] = " << mag << std::endl;
+  }
+
+  std::cout << std::endl;
+
+  for (int i{0}; i < 10; ++i) {
+    float mag = std::sqrtf(s2[i].real * s2[i].real +
+                           s2[i].imag * s2[i].imag);
+    std::cout << "mag[" << i << "] = " << mag << std::endl;
   }
 
   return 0;
