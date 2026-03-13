@@ -34,59 +34,17 @@ FFTDetector::FFTDetector(ImgData &id) : img_(id) {
 /* Core Public functions */
 /* --------------------- */
 void FFTDetector::run_detection() {
+  // todo: implement some algorithm to detect
+  // if the given image is real or ai.
+}
+
+/* calculates 1d and 2d ffts using utility functions:
+ * - calculate_fft_1d
+ * - calculate_fft_2d
+ */
+void FFTDetector::calculate_fft() {
   calculate_fft_1d();
   calculate_fft_2d();
-
-  // todo: implement some algorithm to detect
-  // if the given image is real or ai using the
-  // fft spectrum we calculated
-}
-
-/* _______ */
-/* Getters */
-/* ------- */
-std::vector<cmplx> FFTDetector::get_spectrum_1d() { return spectrum_1d_; }
-std::vector<cmplx> FFTDetector::get_spectrum_2d() { return spectrum_2d_; }
-std::vector<float> FFTDetector::get_aaps() { return aaps_; }
-
-/* _________________ */
-/* Utility Functions */
-/* ----------------- */
-
-/*
- * Horizontal Pass:
- * function transforms each `row` from spatial (pixels) to frequency (waves).
- * to generate the 1d fft spectrum
- */
-void FFTDetector::calculate_fft_1d() {
-  for (int y{0}; y < img_.height; ++y) {
-    STB_FFT_R2C(gray_.data() + y * img_.width,
-                spectrum_1d_.data() + y * img_.width, img_.width);
-  }
-}
-
-/*
- * Vertical Pass:
- * transforms the results of the horizontal pass along the `columns`.
- * to generate the 2d fft spectrum
- */
-void FFTDetector::calculate_fft_2d() {
-  for (int i{0}; i < img_.height * img_.width; ++i) {
-    spectrum_2d_[i] = spectrum_1d_[i];
-  }
-
-  std::vector<cmplx> col_in(img_.height), col_out(img_.height);
-  for (int x{0}; x < img_.width; ++x) {
-    for (int y{0}; y < img_.height; ++y) {
-      col_in[y] = spectrum_2d_[y * img_.width + x];
-    }
-
-    STB_FFT(col_in.data(), col_out.data(), img_.height);
-
-    for (int y{0}; y < img_.height; ++y) {
-      spectrum_2d_[y * img_.width + x] = col_out[y];
-    }
-  }
 }
 
 /* make a ppm file for the fft spectrum generated */
@@ -172,6 +130,53 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
     for (int i{0}; i < (int)aaps_.size(); ++i) {
       float kr = i / (num_rings - 1.0f);
       out << kr << "\t\t" << aaps_[i] << "\n";
+    }
+  }
+}
+
+/* _______ */
+/* Getters */
+/* ------- */
+std::vector<cmplx> FFTDetector::get_spectrum_1d() { return spectrum_1d_; }
+std::vector<cmplx> FFTDetector::get_spectrum_2d() { return spectrum_2d_; }
+std::vector<float> FFTDetector::get_aaps() { return aaps_; }
+
+/* _________________ */
+/* Utility Functions */
+/* ----------------- */
+
+/*
+ * Horizontal Pass:
+ * function transforms each `row` from spatial (pixels) to frequency (waves).
+ * to generate the 1d fft spectrum
+ */
+void FFTDetector::calculate_fft_1d() {
+  for (int y{0}; y < img_.height; ++y) {
+    STB_FFT_R2C(gray_.data() + y * img_.width,
+                spectrum_1d_.data() + y * img_.width, img_.width);
+  }
+}
+
+/*
+ * Vertical Pass:
+ * transforms the results of the horizontal pass along the `columns`.
+ * to generate the 2d fft spectrum
+ */
+void FFTDetector::calculate_fft_2d() {
+  for (int i{0}; i < img_.height * img_.width; ++i) {
+    spectrum_2d_[i] = spectrum_1d_[i];
+  }
+
+  std::vector<cmplx> col_in(img_.height), col_out(img_.height);
+  for (int x{0}; x < img_.width; ++x) {
+    for (int y{0}; y < img_.height; ++y) {
+      col_in[y] = spectrum_2d_[y * img_.width + x];
+    }
+
+    STB_FFT(col_in.data(), col_out.data(), img_.height);
+
+    for (int y{0}; y < img_.height; ++y) {
+      spectrum_2d_[y * img_.width + x] = col_out[y];
     }
   }
 }

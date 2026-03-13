@@ -8,6 +8,7 @@ class FFTDetector {
 public:
   FFTDetector(ImgData &id);
   void run_detection();
+  void calculate_fft();
   void make_fft_ppm(const std::string &outfile_path);
   void calculate_aaps(const std::string &outfile_path = "");
 
