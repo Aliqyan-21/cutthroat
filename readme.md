@@ -9,6 +9,7 @@ The constraint is to do it without embedding AI in our tool, just using pure mat
 
 ## Observation
 - FFT observation: [here](observations/fft_obs.md)
+- AAPS observation: [here](observations/aaps_obs.md)
 
 ### Test Data Sources
 

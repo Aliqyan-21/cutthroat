@@ -26,6 +26,8 @@ FFTDetector::FFTDetector(ImgData &id) : img_(id) {
       gray_[y * img_.width + x] = gray[y][x];
     }
   }
+
+  aaps_.resize(img_.width / 2);
 }
 
 /* _____________________ */
@@ -45,6 +47,7 @@ void FFTDetector::run_detection() {
 /* ------- */
 std::vector<cmplx> FFTDetector::get_spectrum_1d() { return spectrum_1d_; }
 std::vector<cmplx> FFTDetector::get_spectrum_2d() { return spectrum_2d_; }
+std::vector<float> FFTDetector::get_aaps() { return aaps_; }
 
 /* _________________ */
 /* Utility Functions */
@@ -86,6 +89,7 @@ void FFTDetector::calculate_fft_2d() {
   }
 }
 
+/* make a ppm file for the fft spectrum generated */
 void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
   /* for each pixel in spectrum:
    * - mirror using hermitian symmetry (r2c only fills w/2+1 cols)
@@ -118,5 +122,56 @@ void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
     uint8_t p     = static_cast<uint8_t>(255.0f * (m - *mn) / range);
     char pixel[3] = {(char)p, (char)p, (char)p};
     out.write(pixel, 3);
+  }
+}
+
+/*
+ * the function make 1d radial distribution called Azimuthal Average Power
+ * Spectrum (AAPS) from 2d fft spectrum by averaging the magnitude of all pixels
+ * located within concentring rings. resulting AAPS vector provide `freq
+ * signature` of image.
+ *
+ * if outfile_path is provided the AAPS vector is written into
+ * a gnuplot friendly file to be plotted with gnuplot script.
+ */
+void FFTDetector::calculate_aaps(const std::string &outfile_path) {
+  int num_rings = img_.width / 2;
+
+  std::vector<int> counts(num_rings, 0);  // count of pixel
+
+  /* now, max possible distance from center to corner */
+  float kr_max =
+    std::sqrt(img_.width * img_.width +
+              img_.height * img_.height); /* kr_max = sqrt(cx^2 * cy^2) */
+
+  for (int y{0}; y < img_.height; ++y) {
+    for (int x{0}; x < img_.width; ++x) {
+      /* normalized ([0.0,1.0]) radial distance kr = sqrt(dx^2 + dy^2)/kr_max */
+      float kr = std::sqrt(x * x + y * y) / kr_max;
+
+      int ring = static_cast<int>(kr * (num_rings - 1));
+      if (ring >= num_rings) { continue; }
+
+      /* magnitude of complex frequency point
+       * mag = sqrt(real^2 + imaginary^2);
+       */
+      float re = spectrum_2d_[y * img_.width + x].real;
+      float im = spectrum_2d_[y * img_.width + x].imag;
+      aaps_[ring] += std::sqrt(re * re + im * im);
+      counts[ring]++;
+    }
+  }
+  /* average each ring according to pixel count, ofc */
+  for (int i{0}; i < num_rings; ++i) {
+    if (counts[i] > 0) { aaps_[i] /= counts[i]; }
+  }
+
+  if (!outfile_path.empty()) {
+    std::ofstream out(outfile_path);
+    out << "# kr\t\tc(kr)\n";
+    for (int i{0}; i < (int)aaps_.size(); ++i) {
+      float kr = i / (num_rings - 1.0f);
+      out << kr << "\t\t" << aaps_[i] << "\n";
+    }
   }
 }

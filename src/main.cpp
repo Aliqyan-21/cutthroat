@@ -4,25 +4,33 @@
 #include "loader.h"
 
 struct Args {
-  std::string file_path;
+  std::string real_image_path;
+  std::string ai_image_path;
 };
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    std::cerr << "usage: " << argv[0] << " <file path>" << std::endl;
+  if (argc < 3) {
+    std::cerr << "usage: " << argv[0] << " <real image path> <ai image path>"
+              << std::endl;
     return 1;
   }
   Args args;
-  args.file_path = argv[1];
+  args.real_image_path = argv[1];
+  args.ai_image_path   = argv[2];
 
-  auto d = load_image(args.file_path);
+  {
+    auto d = load_image(args.real_image_path);
+    FFTDetector fd(d);
+    fd.run_detection();
+    fd.calculate_aaps("real_aaps.dat");
+  }
 
-  FFTDetector fd(d);
-  fd.run_detection();
-  auto s1 = fd.get_spectrum_1d();
-  auto s2 = fd.get_spectrum_2d();
-
-  fd.make_fft_ppm("image.ppm");
+  {
+    auto d = load_image(args.ai_image_path);
+    FFTDetector fd(d);
+    fd.run_detection();
+    fd.calculate_aaps("ai_aaps.dat");
+  }
 
   return 0;
 }
