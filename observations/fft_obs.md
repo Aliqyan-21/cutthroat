@@ -20,10 +20,10 @@ Both images are 700x525.
 - `test_data/ai/1.jpeg` : gemini recreation of the same image
 
 ### Real Image
-![real image](../assets/ppm/ai.png =300x300)
+<img src="../assets/ppm/ai.png" width="300" alt="real image">
 
 ### AI Generated Image
-![ai generated image](../assets/ppm/real.png =300x300)
+<img src="../assets/ppm/real.png" width="300" alt="ai generated image">
 
 > note: ppm converted to png to show in github markdown
 
