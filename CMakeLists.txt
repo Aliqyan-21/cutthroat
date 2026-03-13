@@ -18,13 +18,16 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 set(SOURCES
   src/loader.cpp
   src/preprocessing.cpp
+  src/fft_detector.cpp
   src/main.cpp
 )
 
 set(HEADERS
   include/stb_image.h
+  include/stb_fft.h
   include/loader.h
   include/preprocessing.h
+  include/fft_detector.h
 )
 
 set(COMPILE_FLAGS_DEBUG -Wall -ggdb3 -O0)

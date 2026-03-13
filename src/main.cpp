@@ -1,7 +1,7 @@
 #include <iostream>
 
+#include "fft_detector.h"
 #include "loader.h"
-#include "preprocessing.h"
 
 struct Args {
   std::string file_path;
@@ -17,14 +17,12 @@ int main(int argc, char *argv[]) {
 
   auto d = load_image(args.file_path);
 
-  std::cout << "image loaded with width = " << d.width
-            << " and height = " << d.height << std::endl;
+  FFTDetector fd(d);
+  fd.run_detection();
+  auto s1 = fd.get_spectrum_1d();
+  auto s2 = fd.get_spectrum_2d();
 
-  auto gray = make_grayscale(d);
-
-  for (int i{0}; i < 10; ++i) {
-    for (int j{0}; j < 10; ++j) { std::cout << gray[i][j] << std::endl; }
-  }
+  fd.make_fft_ppm("image.ppm");
 
   return 0;
 }
