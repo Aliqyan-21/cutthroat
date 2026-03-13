@@ -1,6 +1,10 @@
 #define STB_FFT_IMPLEMENTAION
 #include "fft_detector.h"
 
+#include <algorithm>
+#include <cmath>
+#include <fstream>
+
 #include "preprocessing.h"
 
 FFTDetector::FFTDetector(ImgData &id) : img_(id) {
@@ -79,5 +83,40 @@ void FFTDetector::calculate_fft_2d() {
     for (int y{0}; y < img_.height; ++y) {
       spectrum_2d_[y * img_.width + x] = col_out[y];
     }
+  }
+}
+
+void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
+  /* for each pixel in spectrum:
+   * - mirror using hermitian symmetry (r2c only fills w/2+1 cols)
+   *   because if not done we get image half black
+   * - compute log of magnitude and save to fft-shifted destination
+   * - so DC move from corner to center
+   */
+  std::vector<float> mag(img_.width * img_.height);
+  for (int y{0}; y < img_.height; ++y) {
+    for (int x{0}; x < img_.width; ++x) {
+      int sx       = (x + img_.width / 2) % img_.width;
+      int sy       = (y + img_.height / 2) % img_.height;
+      int target_x = (x <= img_.width / 2) ? x : img_.width - x;
+
+      auto &c = spectrum_2d_[y * img_.width + target_x];
+      float m = std::sqrt(c.real * c.real + c.imag * c.imag);
+
+      mag[sy * img_.width + sx] = std::log(m);
+    }
+  }
+
+  /* normalize log to [0,255] for image */
+  auto [mn, mx] = std::minmax_element(mag.begin(), mag.end());
+  float range   = *mx - *mn + 1e-6f;
+
+  /* write result in ppm format */
+  std::ofstream out(outfile_path, std::ios::binary);
+  out << "P6\n" << img_.width << " " << img_.height << "\n255\n";
+  for (float m : mag) {
+    uint8_t p     = static_cast<uint8_t>(255.0f * (m - *mn) / range);
+    char pixel[3] = {(char)p, (char)p, (char)p};
+    out.write(pixel, 3);
   }
 }

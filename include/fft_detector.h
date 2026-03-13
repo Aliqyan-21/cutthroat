@@ -8,6 +8,7 @@ class FFTDetector {
 public:
   FFTDetector(ImgData &id);
   void run_detection();
+  void make_fft_ppm(const std::string &outfile_path);
 
   std::vector<cmplx> get_spectrum_1d();
   std::vector<cmplx> get_spectrum_2d();
