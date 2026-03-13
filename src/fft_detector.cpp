@@ -7,27 +7,27 @@
 
 #include "preprocessing.h"
 
-FFTDetector::FFTDetector(ImgData &id) : img_(id) {
+FFTDetector::FFTDetector(const ImgData &id) : img_(id) {
   /* this step is necessary to make width and height even number
    * as stb_fft does not work on odd values */
-  img_.width  = img_.width % 2 == 0 ? img_.width : img_.width + 1;
-  img_.height = img_.height % 2 == 0 ? img_.height : img_.height + 1;
+  fft_width_  = img_.width % 2 == 0 ? img_.width : img_.width + 1;
+  fft_height_ = img_.height % 2 == 0 ? img_.height : img_.height + 1;
 
   /* resizing of spectrum_1d_ and spectrum_2d_ */
-  spectrum_1d_.resize(img_.width * img_.height);
-  spectrum_2d_.resize(img_.width * img_.height);
+  spectrum_1d_.resize(fft_width_ * fft_height_);
+  spectrum_2d_.resize(fft_width_ * fft_height_);
 
   /* forming flattened gray scale vector */
-  int total = img_.width * img_.height;
+  int total = fft_width_ * fft_height_;
   gray_.assign(total, 0.0f);
   auto gray = make_grayscale(img_);
   for (int y{0}; y < img_.height; ++y) {
     for (int x{0}; x < img_.width; ++x) {
-      gray_[y * img_.width + x] = gray[y][x];
+      gray_[y * fft_width_ + x] = gray[y][x];
     }
   }
 
-  aaps_.resize(img_.width / 2);
+  aaps_.resize(fft_width_ / 2);
 }
 
 /* _____________________ */
@@ -55,17 +55,17 @@ void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
    * - compute log of magnitude and save to fft-shifted destination
    * - so DC move from corner to center
    */
-  std::vector<float> mag(img_.width * img_.height);
-  for (int y{0}; y < img_.height; ++y) {
-    for (int x{0}; x < img_.width; ++x) {
-      int sx       = (x + img_.width / 2) % img_.width;
-      int sy       = (y + img_.height / 2) % img_.height;
-      int target_x = (x <= img_.width / 2) ? x : img_.width - x;
+  std::vector<float> mag(fft_width_ * fft_height_);
+  for (int y{0}; y < fft_height_; ++y) {
+    for (int x{0}; x < fft_width_; ++x) {
+      int sx       = (x + fft_width_ / 2) % fft_width_;
+      int sy       = (y + fft_height_ / 2) % fft_height_;
+      int target_x = (x <= fft_width_ / 2) ? x : fft_width_ - x;
 
-      auto &c = spectrum_2d_[y * img_.width + target_x];
+      auto &c = spectrum_2d_[y * fft_width_ + target_x];
       float m = std::sqrt(c.real * c.real + c.imag * c.imag);
 
-      mag[sy * img_.width + sx] = std::log(m);
+      mag[sy * fft_width_ + sx] = std::log(m);
     }
   }
 
@@ -75,7 +75,7 @@ void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
 
   /* write result in ppm format */
   std::ofstream out(outfile_path, std::ios::binary);
-  out << "P6\n" << img_.width << " " << img_.height << "\n255\n";
+  out << "P6\n" << fft_width_ << " " << fft_height_ << "\n255\n";
   for (float m : mag) {
     uint8_t p     = static_cast<uint8_t>(255.0f * (m - *mn) / range);
     char pixel[3] = {(char)p, (char)p, (char)p};
@@ -93,17 +93,17 @@ void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
  * a gnuplot friendly file to be plotted with gnuplot script.
  */
 void FFTDetector::calculate_aaps(const std::string &outfile_path) {
-  int num_rings = img_.width / 2;
+  int num_rings = fft_width_ / 2;
 
   std::vector<int> counts(num_rings, 0);  // count of pixel
 
   /* now, max possible distance from center to corner */
   float kr_max =
-    std::sqrt(img_.width * img_.width +
-              img_.height * img_.height); /* kr_max = sqrt(cx^2 * cy^2) */
+    std::sqrt(fft_width_ * fft_width_ +
+              fft_height_ * fft_height_); /* kr_max = sqrt(cx^2 * cy^2) */
 
-  for (int y{0}; y < img_.height; ++y) {
-    for (int x{0}; x < img_.width; ++x) {
+  for (int y{0}; y < fft_height_; ++y) {
+    for (int x{0}; x < fft_width_; ++x) {
       /* normalized ([0.0,1.0]) radial distance kr = sqrt(dx^2 + dy^2)/kr_max */
       float kr = std::sqrt(x * x + y * y) / kr_max;
 
@@ -113,8 +113,8 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
       /* magnitude of complex frequency point
        * mag = sqrt(real^2 + imaginary^2);
        */
-      float re = spectrum_2d_[y * img_.width + x].real;
-      float im = spectrum_2d_[y * img_.width + x].imag;
+      float re = spectrum_2d_[y * fft_width_ + x].real;
+      float im = spectrum_2d_[y * fft_width_ + x].imag;
       aaps_[ring] += std::sqrt(re * re + im * im);
       counts[ring]++;
     }
@@ -151,9 +151,9 @@ std::vector<float> FFTDetector::get_aaps() { return aaps_; }
  * to generate the 1d fft spectrum
  */
 void FFTDetector::calculate_fft_1d() {
-  for (int y{0}; y < img_.height; ++y) {
-    STB_FFT_R2C(gray_.data() + y * img_.width,
-                spectrum_1d_.data() + y * img_.width, img_.width);
+  for (int y{0}; y < fft_height_; ++y) {
+    STB_FFT_R2C(gray_.data() + y * fft_width_,
+                spectrum_1d_.data() + y * fft_width_, fft_width_);
   }
 }
 
@@ -163,20 +163,20 @@ void FFTDetector::calculate_fft_1d() {
  * to generate the 2d fft spectrum
  */
 void FFTDetector::calculate_fft_2d() {
-  for (int i{0}; i < img_.height * img_.width; ++i) {
+  for (int i{0}; i < fft_height_ * fft_width_; ++i) {
     spectrum_2d_[i] = spectrum_1d_[i];
   }
 
-  std::vector<cmplx> col_in(img_.height), col_out(img_.height);
-  for (int x{0}; x < img_.width; ++x) {
-    for (int y{0}; y < img_.height; ++y) {
-      col_in[y] = spectrum_2d_[y * img_.width + x];
+  std::vector<cmplx> col_in(fft_height_), col_out(fft_height_);
+  for (int x{0}; x < fft_width_; ++x) {
+    for (int y{0}; y < fft_height_; ++y) {
+      col_in[y] = spectrum_2d_[y * fft_width_ + x];
     }
 
-    STB_FFT(col_in.data(), col_out.data(), img_.height);
+    STB_FFT(col_in.data(), col_out.data(), fft_height_);
 
-    for (int y{0}; y < img_.height; ++y) {
-      spectrum_2d_[y * img_.width + x] = col_out[y];
+    for (int y{0}; y < fft_height_; ++y) {
+      spectrum_2d_[y * fft_width_ + x] = col_out[y];
     }
   }
 }

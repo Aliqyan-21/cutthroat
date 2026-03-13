@@ -6,7 +6,7 @@
 
 class FFTDetector {
 public:
-  FFTDetector(ImgData &id);
+  FFTDetector(const ImgData &id);
   void run_detection();
   void calculate_fft();
   void make_fft_ppm(const std::string &outfile_path);
@@ -17,7 +17,8 @@ public:
   std::vector<float> get_aaps();
 
 private:
-  ImgData &img_;
+  const ImgData &img_;
+  int fft_width_, fft_height_;
   std::vector<float> gray_;
   std::vector<cmplx> spectrum_1d_;
   std::vector<cmplx> spectrum_2d_;

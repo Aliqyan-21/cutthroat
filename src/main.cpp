@@ -21,14 +21,14 @@ int main(int argc, char *argv[]) {
   {
     auto d = load_image(args.real_image_path);
     FFTDetector fd(d);
-    fd.run_detection();
+    fd.calculate_fft();
     fd.calculate_aaps("real_aaps.dat");
   }
 
   {
     auto d = load_image(args.ai_image_path);
     FFTDetector fd(d);
-    fd.run_detection();
+    fd.calculate_fft();
     fd.calculate_aaps("ai_aaps.dat");
   }
 
