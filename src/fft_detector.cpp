@@ -159,6 +159,13 @@ void FFTDetector::fit_power_law() {
   float win_size = (1024.0f / min_dim) * 0.25f;
   float kT_low   = std::clamp(kT_high - win_size, 0.05f, 0.45f);
 
+  float dc = aaps_[0];
+  if (dc <= 0.0f) {
+    b1_ = 0.0f;
+    b2_ = 0.0f;
+    return;
+  }
+
   float sum_x{0.0f};
   float sum_y{0.0f};
   float sum_xx{0.0f};
@@ -175,7 +182,7 @@ void FFTDetector::fit_power_law() {
      * X = log(kr/kT)  — normalized so X=0 at threshold
      * Y = log(c(kr))  — log of mag */
     float X = std::log(kr / kT_low);
-    float Y = std::log(aaps_[i]);
+    float Y = std::log(aaps_[i] / dc);
 
     sum_x += X;
     sum_y += Y;
