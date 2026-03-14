@@ -26,8 +26,6 @@ FFTDetector::FFTDetector(const ImgData &id) : img_(id) {
       gray_[y * fft_width_ + x] = gray[y][x];
     }
   }
-
-  aaps_.resize(fft_width_ / 2);
 }
 
 /* _____________________ */
@@ -93,8 +91,9 @@ void FFTDetector::make_fft_ppm(const std::string &outfile_path) {
  * a gnuplot friendly file to be plotted with gnuplot script.
  */
 void FFTDetector::calculate_aaps(const std::string &outfile_path) {
-  int num_rings = fft_width_ / 2;
+  const int num_rings = 1024;
 
+  aaps_.assign(num_rings, 0.0f);
   std::vector<int> counts(num_rings, 0);  // count of pixel
 
   /* now, max possible distance from center to corner */
@@ -105,7 +104,8 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
   for (int y{0}; y < fft_height_; ++y) {
     for (int x{0}; x < fft_width_; ++x) {
       /* normalized ([0.0,1.0]) radial distance kr = sqrt(dx^2 + dy^2)/kr_max */
-      float kr = std::sqrt(x * x + y * y) / kr_max;
+      int target_x = (x <= fft_width_ / 2) ? x : fft_width_ - x;
+      float kr     = std::sqrt(target_x * target_x + y * y) / kr_max;
 
       int ring = static_cast<int>(kr * (num_rings - 1));
       if (ring >= num_rings) { continue; }
@@ -113,9 +113,8 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
       /* magnitude of complex frequency point
        * mag = sqrt(real^2 + imaginary^2);
        */
-      float re = spectrum_2d_[y * fft_width_ + x].real;
-      float im = spectrum_2d_[y * fft_width_ + x].imag;
-      aaps_[ring] += std::sqrt(re * re + im * im);
+      cmplx &c = spectrum_2d_[y * fft_width_ + target_x];
+      aaps_[ring] += std::sqrt(c.real * c.real + c.imag * c.imag);
       counts[ring]++;
     }
   }
@@ -150,67 +149,61 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
  */
 void FFTDetector::fit_power_law() {
   int num_rings = (int)aaps_.size();
-
-  /* according to resolution of image the kT should be different
-   * we want the window (kT_high - kT_low) to expand as resolution drops.
-   */
-  float kT_high  = 0.50f;
-  int min_dim    = std::min(fft_width_, fft_height_);
-  float win_size = (1024.0f / min_dim) * 0.25f;
-  float kT_low   = std::clamp(kT_high - win_size, 0.05f, 0.45f);
-
-  float dc = aaps_[0];
+  float dc      = aaps_[0];
   if (dc <= 0.0f) {
     b1_ = 0.0f;
     b2_ = 0.0f;
     return;
   }
 
-  float sum_x{0.0f};
-  float sum_y{0.0f};
-  float sum_xx{0.0f};
-  float sum_xy{0.0f};
-  int n{0};
+  /* according to resolution of image the kT should be different
+   * we want the window (kT_high - kT_low) to expand as resolution drops.
+   */
+  float b1_kT_low  = 0.05f;
+  float b1_kT_high = 0.50f;
+  float b2_kT_low  = 0.75f;
+  float b2_kT_high = 0.95f;
 
-  for (int i{0}; i < num_rings; ++i) {
-    float kr = i / (num_rings - 1.0f);
-    /* skip faltu things */
-    if (kr <= kT_low || kr > kT_high) { continue; }
-    if (aaps_[i] <= 0.0f) { continue; }
+  auto regress = [&](float kT_low, float kT_high) -> std::pair<float, float> {
+    float sum_x{0.0f};
+    float sum_y{0.0f};
+    float sum_xx{0.0f};
+    float sum_xy{0.0f};
+    int n{0};
+    for (int i{0}; i < num_rings; ++i) {
+      float kr = i / (num_rings - 1.0f);
+      /* skip faltu things */
+      if (kr <= kT_low || kr > kT_high) { continue; }
+      if (aaps_[i] <= 0.0f) { continue; }
 
-    /* log-log transform:
-     * X = log(kr/kT)  — normalized so X=0 at threshold
-     * Y = log(c(kr))  — log of mag */
-    float X = std::log(kr / kT_low);
-    float Y = std::log(aaps_[i] / dc);
+      /* log-log transform:
+       * X = log(kr/kT)  — normalized so X=0 at threshold
+       * Y = log(c(kr))  — log of mag */
+      float X = std::log(kr / kT_low);
+      float Y = std::log(aaps_[i] / dc);
+      sum_x += X;
+      sum_y += Y;
+      sum_xx += X * X;
+      sum_xy += X * Y;
+      n++;
+    }
+    if (n < 2) { return {0.0f, 0.0f}; }
+    float denom = (float)n * sum_xx - sum_x * sum_x;
+    /* linear regression:
+     * b2 = (n*Exy - Ex*Σy) / (n*Ex² - (Ex)²)
+     * a  = (Ey - b2*Ex) / n
+     * b1 = exp(a)  - recover from log space */
+    if (std::abs(denom) < 1e-10f) { return {0.0f, 0.0f}; }
+    float b2 = (n * sum_xy - sum_x * sum_y) / denom;
+    float a  = (sum_y - b2 * sum_x) / (float)n;
+    return {std::exp(a), b2};
+  };
 
-    sum_x += X;
-    sum_y += Y;
-    sum_xx += X * X;
-    sum_xy += X * Y;
-    n++;
-  }
+  auto [b1, i1] = regress(b1_kT_low, b1_kT_high);
+  auto [i2, b2] = regress(b2_kT_low, b2_kT_high);
 
-  if (n < 2) {
-    b1_ = 0.0f;
-    b2_ = 0.0f;
-    return;
-  }
-
-  /* linear regression:
-   * b2 = (n*Exy - Ex*Σy) / (n*Ex² - (Ex)²)
-   * a  = (Ey - b2*Ex) / n
-   * b1 = exp(a)  - recover from log space */
-  float denom = (float)n * sum_xx - sum_x * sum_x;
-  if (std::abs(denom) < 1e-10f) {
-    b1_ = 0.0f;
-    b2_ = 0.0f;
-    return;
-  }
-
-  b2_     = ((float)n * sum_xy - sum_x * sum_y) / denom;
-  float a = (sum_y - b2_ * sum_x) / (float)n;
-  b1_     = std::exp(a);
+  b1_ = b1;
+  b2_ = b2;
 }
 
 /* _______ */
