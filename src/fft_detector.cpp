@@ -99,8 +99,8 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
 
   /* now, max possible distance from center to corner */
   float kr_max =
-    std::sqrt(fft_width_ * fft_width_ +
-              fft_height_ * fft_height_); /* kr_max = sqrt(cx^2 * cy^2) */
+    std::sqrt((img_.width * img_.width + img_.height * img_.height) /
+              4.0f); /* kr_max = sqrt(w^2 + h^2)/4 */
 
   for (int y{0}; y < fft_height_; ++y) {
     for (int x{0}; x < fft_width_; ++x) {
@@ -134,12 +134,86 @@ void FFTDetector::calculate_aaps(const std::string &outfile_path) {
   }
 }
 
+/*
+ * function fits power low c(kr) to high level frequency of AAPS curve
+ * using log-log linear regression
+ *
+ * here,
+ * kT : threshold wavenumber, kr > kT
+ * b1_ : output magnitude parameter
+ * b2_ : output decay rate parameter
+ *
+ * on log log scale, power law becomes a straight line:
+ *  log(c(kr)) = log(b1) + b2 + log(kr/kT)
+ * so we just do simple linear regression
+ * calculations on the transformed points.
+ */
+void FFTDetector::fit_power_law() {
+  int num_rings = (int)aaps_.size();
+
+  /* according to resolution of image the kT should be different
+   * we want the window (kT_high - kT_low) to expand as resolution drops.
+   */
+  float kT_high  = 0.50f;
+  int min_dim    = std::min(fft_width_, fft_height_);
+  float win_size = (1024.0f / min_dim) * 0.25f;
+  float kT_low   = std::clamp(kT_high - win_size, 0.05f, 0.45f);
+
+  float sum_x{0.0f};
+  float sum_y{0.0f};
+  float sum_xx{0.0f};
+  float sum_xy{0.0f};
+  int n{0};
+
+  for (int i{0}; i < num_rings; ++i) {
+    float kr = i / (num_rings - 1.0f);
+    /* skip faltu things */
+    if (kr <= kT_low || kr > kT_high) { continue; }
+    if (aaps_[i] <= 0.0f) { continue; }
+
+    /* log-log transform:
+     * X = log(kr/kT)  — normalized so X=0 at threshold
+     * Y = log(c(kr))  — log of mag */
+    float X = std::log(kr / kT_low);
+    float Y = std::log(aaps_[i]);
+
+    sum_x += X;
+    sum_y += Y;
+    sum_xx += X * X;
+    sum_xy += X * Y;
+    n++;
+  }
+
+  if (n < 2) {
+    b1_ = 0.0f;
+    b2_ = 0.0f;
+    return;
+  }
+
+  /* linear regression:
+   * b2 = (n*Exy - Ex*Σy) / (n*Ex² - (Ex)²)
+   * a  = (Ey - b2*Ex) / n
+   * b1 = exp(a)  - recover from log space */
+  float denom = (float)n * sum_xx - sum_x * sum_x;
+  if (std::abs(denom) < 1e-10f) {
+    b1_ = 0.0f;
+    b2_ = 0.0f;
+    return;
+  }
+
+  b2_     = ((float)n * sum_xy - sum_x * sum_y) / denom;
+  float a = (sum_y - b2_ * sum_x) / (float)n;
+  b1_     = std::exp(a);
+}
+
 /* _______ */
 /* Getters */
 /* ------- */
 std::vector<cmplx> FFTDetector::get_spectrum_1d() { return spectrum_1d_; }
 std::vector<cmplx> FFTDetector::get_spectrum_2d() { return spectrum_2d_; }
 std::vector<float> FFTDetector::get_aaps() { return aaps_; }
+float FFTDetector::get_b1() { return b1_; }
+float FFTDetector::get_b2() { return b2_; }
 
 /* _________________ */
 /* Utility Functions */

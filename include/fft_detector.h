@@ -11,10 +11,13 @@ public:
   void calculate_fft();
   void make_fft_ppm(const std::string &outfile_path);
   void calculate_aaps(const std::string &outfile_path = "");
+  void fit_power_law();
 
   std::vector<cmplx> get_spectrum_1d();
   std::vector<cmplx> get_spectrum_2d();
   std::vector<float> get_aaps();
+  float get_b1();
+  float get_b2();
 
 private:
   const ImgData &img_;
@@ -23,6 +26,7 @@ private:
   std::vector<cmplx> spectrum_1d_;
   std::vector<cmplx> spectrum_2d_;
   std::vector<float> aaps_;
+  float b1_, b2_; /* magnitude, rate */
 
   void calculate_fft_1d();
   void calculate_fft_2d();

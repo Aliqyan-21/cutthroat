@@ -23,6 +23,10 @@ int main(int argc, char *argv[]) {
     FFTDetector fd(d);
     fd.calculate_fft();
     fd.calculate_aaps("real_aaps.dat");
+    fd.fit_power_law();
+    std::cout << "Real Image b1 and b2:" << std::endl;
+    std::cout << "b1: " << fd.get_b1() << std::endl;
+    std::cout << "b2: " << fd.get_b2() << std::endl;
   }
 
   {
@@ -30,6 +34,10 @@ int main(int argc, char *argv[]) {
     FFTDetector fd(d);
     fd.calculate_fft();
     fd.calculate_aaps("ai_aaps.dat");
+    fd.fit_power_law();
+    std::cout << "AI Image b1 and b2:" << std::endl;
+    std::cout << "b1: " << fd.get_b1() << std::endl;
+    std::cout << "b2: " << fd.get_b2() << std::endl;
   }
 
   return 0;
